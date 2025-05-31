@@ -34,54 +34,76 @@ function initButton(sfHost, inInspector) {
 
   addFlowScrollability();
 
-  function addFlowScrollability(popupEl) {
+  function addFlowScrollability() {
     const currentUrl = window.location.href;
     // Check the current URL for the string "builder_platform_interaction"
     if (currentUrl.includes("builder_platform_interaction")) {
       // Create a new checkbox element
       const headerFlow = document.querySelector("builder_platform_interaction-container-common");
+      if (!headerFlow) return;
+
       const overflowCheckbox = document.createElement("input");
       overflowCheckbox.type = "checkbox";
       overflowCheckbox.id = "overflow-checkbox";
-      const checkboxState = iFrameLocalStorage.scrollOnFlowBuilder;
-      // Check local storage for the checkbox state
-      (checkboxState != null) ? (overflowCheckbox.checked = checkboxState) : (overflowCheckbox.checked = true);
+      // Get the checkbox state from chrome.storage.local
+      chrome.storage.local.get(["scrollOnFlowBuilder"], (result) => {
+        overflowCheckbox.checked = result.scrollOnFlowBuilder !== false; // Default to true if not set
+      });
+
       // Create a new label element for the checkbox
       const overflowLabel = document.createElement("label");
       overflowLabel.textContent = "Enable flow scrollability";
       overflowLabel.htmlFor = "overflow-checkbox";
-      if (currentUrl.includes("sandbox")){
+
+      if (currentUrl.includes("sandbox")) {
         overflowCheckbox.className = "checkboxScrollSandbox";
         overflowLabel.className = "labelCheckboxScrollSandbox";
       } else {
         overflowCheckbox.className = "checkboxScrollProd";
         overflowLabel.className = "labeCheckboxScrollProd";
       }
+
       // Get a reference to the <head> element
       const head = document.head;
       // Create a new <style> element
       const style = document.createElement("style");
       // Set the initial text content of the <style> element
-      style.textContent = ".canvas {overflow : auto!important ; }";
+      style.textContent = `
+        .canvas { overflow: auto !important; }
+        .flow-builder-canvas { overflow: auto !important; }
+        .flow-builder-canvas-container { overflow: auto !important; }
+        .flow-builder-canvas-content { overflow: auto !important; }
+      `;
       // Append the <style> element to the <head> element
       head.appendChild(style);
+
       // Append the checkbox and label elements to the body of the document
       headerFlow.appendChild(overflowCheckbox);
       headerFlow.appendChild(overflowLabel);
-      // Set the overflow property to "auto"
-      overflowCheckbox.checked ? style.textContent = ".canvas {overflow : auto!important ; }" : style.textContent = ".canvas {overflow : hidden!important ; }";
+
+      // Set initial overflow state
+      updateOverflowState(overflowCheckbox.checked);
+
       // Listen for changes to the checkbox state
       overflowCheckbox.addEventListener("change", function() {
-        // Check if the checkbox is currently checked
-        // Save the checkbox state to local storage
-        popupEl.contentWindow.postMessage({
-          updateLocalStorage: true,
-          key: "scrollOnFlowBuilder",
-          value: JSON.stringify(this.checked)
-        }, "*");
-        // Set the overflow property to "auto"
-        this.checked ? style.textContent = ".canvas {overflow : auto!important ; }" : style.textContent = ".canvas {overflow : hidden!important ; }";
+        // Save the checkbox state to chrome.storage.local
+        chrome.storage.local.set({scrollOnFlowBuilder: this.checked});
+        updateOverflowState(this.checked);
       });
+
+      function updateOverflowState(enabled) {
+        style.textContent = enabled ? `
+          .canvas { overflow: auto !important; }
+          .flow-builder-canvas { overflow: auto !important; }
+          .flow-builder-canvas-container { overflow: auto !important; }
+          .flow-builder-canvas-content { overflow: auto !important; }
+        ` : `
+          .canvas { overflow: hidden !important; }
+          .flow-builder-canvas { overflow: hidden !important; }
+          .flow-builder-canvas-container { overflow: hidden !important; }
+          .flow-builder-canvas-content { overflow: hidden !important; }
+        `;
+      }
     }
   }
 
@@ -246,7 +268,7 @@ function initButton(sfHost, inInspector) {
           popupEl.classList.add(`insext-popup-${o}-${dir}`);
         }
         setRootCSSProperties(rootEl, btn);
-        addFlowScrollability(popupEl);
+        addFlowScrollability();
         setFavicon(sfHost);
         popupEl.contentWindow.postMessage({
           insextInitResponse: true,
